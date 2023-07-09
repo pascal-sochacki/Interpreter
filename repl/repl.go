@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"Interpreter/evaluator"
 	"Interpreter/lexer"
 	"Interpreter/parser"
 )
@@ -27,8 +28,11 @@ func Start(in io.Reader, out io.Writer) {
 			printParserErrors(out, p.Errors())
 			continue
 		}
-		io.WriteString(out, program.String())
-		io.WriteString(out, "\n")
+		evaluaded := evaluator.Eval(program)
+		if evaluaded != nil {
+			io.WriteString(out, evaluaded.Inspect())
+			io.WriteString(out, "\n")
+		}
 	}
 }
 
