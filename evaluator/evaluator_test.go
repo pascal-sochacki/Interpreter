@@ -171,7 +171,7 @@ func TestErrorHandling(t *testing.T) {
                 return 1;
             }
             `,
-			"unkown operator: BOOLEAN + BOOLEAN",
+			"unknown operator: BOOLEAN + BOOLEAN",
 		},
 	}
 	for _, tt := range tests {
