@@ -87,6 +87,8 @@ let add = fn(x, y) {
   x + y;
 };
 let result = add(five, ten);
+"foorbar"
+"foor bar"
    `
 	tests := []struct {
 		expectedType    token.TokenType
@@ -128,6 +130,8 @@ let result = add(five, ten);
 		{token.IDENT, "ten"},
 		{token.RPAREN, ")"},
 		{token.SEMICOLON, ";"},
+		{token.STRING, "foorbar"},
+		{token.STRING, "foor bar"},
 		{token.EOF, ""},
 	}
 	l := New(input)
