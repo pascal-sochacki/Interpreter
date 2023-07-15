@@ -46,7 +46,7 @@ func TestOperator(t *testing.T) {
 	}
 }
 
-func TestKeyworkds(t *testing.T) {
+func TestKeywords(t *testing.T) {
 
 	input := `
 true
@@ -89,6 +89,7 @@ let add = fn(x, y) {
 let result = add(five, ten);
 "foorbar"
 "foor bar"
+[1, 2];
    `
 	tests := []struct {
 		expectedType    token.TokenType
@@ -132,6 +133,12 @@ let result = add(five, ten);
 		{token.SEMICOLON, ";"},
 		{token.STRING, "foorbar"},
 		{token.STRING, "foor bar"},
+		{token.LBRACKET, "["},
+		{token.INT, "1"},
+		{token.COMMA, ","},
+		{token.INT, "2"},
+		{token.RBRACKET, "]"},
+		{token.SEMICOLON, ";"},
 		{token.EOF, ""},
 	}
 	l := New(input)
