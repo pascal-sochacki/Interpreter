@@ -74,6 +74,18 @@ func testConstants(
 	return nil
 }
 
+func testIntegerObject(expected int64, actual object.Object) error {
+	result, ok := actual.(*object.Integer)
+	if !ok {
+		return fmt.Errorf("object is not Integer. got=%T (%+v)", actual, actual)
+	}
+	if result.Value != expected {
+		return fmt.Errorf("object has wrong value. got=%d, want=%d",
+			result.Value, expected)
+	}
+	return nil
+}
+
 func testInstructions(expected []code.Instructions, actual code.Instructions) error {
 	concatted := concatInstructions(expected)
 	if len(actual) != len(concatted) {
