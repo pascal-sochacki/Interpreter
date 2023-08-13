@@ -24,6 +24,48 @@ func TestIntegerArithmetic(t *testing.T) {
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpConstant, 0),
 				code.Make(code.OpConstant, 1),
+				code.Make(code.OpAdd),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "1 - 2",
+			expectedConstants: []interface{}{1, 2},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpConstant, 1),
+				code.Make(code.OpSub),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "1 * 2",
+			expectedConstants: []interface{}{1, 2},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpConstant, 1),
+				code.Make(code.OpMul),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "1 / 2",
+			expectedConstants: []interface{}{1, 2},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpConstant, 1),
+				code.Make(code.OpDiv),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "1;2;",
+			expectedConstants: []interface{}{1, 2},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpPop),
+				code.Make(code.OpConstant, 1),
+				code.Make(code.OpPop),
 			},
 		},
 	}
@@ -34,6 +76,7 @@ func runCompilerTests(t *testing.T, tests []compilerTestCase) {
 	t.Helper()
 
 	for _, tt := range tests {
+
 		program := parse(tt.input)
 		compiler := New()
 		err := compiler.Compile(program)
