@@ -189,11 +189,17 @@ func (vm *VM) executeBinaryOperation(op code.Opcode) error {
 	left := vm.pop()
 	leftType := left.Type()
 	rightType := right.Type()
-	if leftType == object.INTEGER_OBJ && leftType == rightType {
+
+	switch {
+	case leftType == object.INTEGER_OBJ && rightType == object.INTEGER_OBJ:
 		return vm.executeBinaryIntergerOperation(op, left, right)
+
+	case leftType == object.STRING_OBJ && rightType == object.STRING_OBJ:
+		return vm.executeBinaryStringOperation(op, left, right)
+	default:
+		return fmt.Errorf("unspported types for binary operation: %s %s", leftType, rightType)
 	}
 
-	return fmt.Errorf("unspported types for binary operation: %s %s", leftType, rightType)
 }
 
 func (vm *VM) executeIntergerComparison(op code.Opcode, left, right object.Object) error {
@@ -236,6 +242,25 @@ func (vm *VM) executeBinaryIntergerOperation(
 	}
 	return vm.push(&object.Integer{Value: result})
 
+}
+
+func (vm *VM) executeBinaryStringOperation(
+
+	op code.Opcode,
+	left, right object.Object,
+
+) error {
+	leftValue := left.(*object.String).Value
+	rightValue := right.(*object.String).Value
+
+	var result string
+	switch op {
+	case code.OpAdd:
+		result = leftValue + rightValue
+	default:
+		return fmt.Errorf("unkown interger operator: %d", op)
+	}
+	return vm.push(&object.String{Value: result})
 }
 
 func (vm *VM) push(o object.Object) error {
