@@ -19,7 +19,7 @@ type VM struct {
 	instructions code.Instructions
 	stack        []object.Object
 	globals      []object.Object
-	sp           int // Always points to the next value. Top of stack is stack[sp-1]
+	stackPointer int // Always points to the next value. Top of stack is stack[sp-1]
 }
 
 func New(bytecode *compiler.Bytecode) *VM {
@@ -28,7 +28,7 @@ func New(bytecode *compiler.Bytecode) *VM {
 		constants:    bytecode.Constants,
 		stack:        make([]object.Object, StackSize),
 		globals:      make([]object.Object, GlobalsSize),
-		sp:           0,
+		stackPointer: 0,
 	}
 }
 
@@ -39,31 +39,40 @@ func NewWithGlobalsStore(bytecode *compiler.Bytecode, s []object.Object) *VM {
 }
 
 func (vm *VM) StackTop() object.Object {
-	if vm.sp == 0 {
+	if vm.stackPointer == 0 {
 		return nil
 	}
-	return vm.stack[vm.sp-1]
+	return vm.stack[vm.stackPointer-1]
 }
 
 func (vm *VM) Run() error {
-	for ip := 0; ip < len(vm.instructions); ip++ {
-		op := code.Opcode(vm.instructions[ip])
+	for intrustionPointer := 0; intrustionPointer < len(vm.instructions); intrustionPointer++ {
+		op := code.Opcode(vm.instructions[intrustionPointer])
 		switch op {
+		case code.OpArray:
+			numElements := int(code.ReadUint16(vm.instructions[intrustionPointer+1:]))
+			intrustionPointer += 2
+			array := vm.buildArray(vm.stackPointer-numElements, vm.stackPointer)
+			vm.stackPointer = vm.stackPointer - numElements
+			err := vm.push(array)
+			if err != nil {
+				return err
+			}
 		case code.OpConstant:
-			constIndex := code.ReadUint16(vm.instructions[ip+1:])
-			ip += 2
+			constIndex := code.ReadUint16(vm.instructions[intrustionPointer+1:])
+			intrustionPointer += 2
 			err := vm.push(vm.constants[constIndex])
 			if err != nil {
 				return err
 			}
 		case code.OpSetGlobal:
-			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
-			ip += 2
+			globalIndex := code.ReadUint16(vm.instructions[intrustionPointer+1:])
+			intrustionPointer += 2
 			vm.globals[globalIndex] = vm.pop()
 		case code.OpGetGlobal:
 
-			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
-			ip += 2
+			globalIndex := code.ReadUint16(vm.instructions[intrustionPointer+1:])
+			intrustionPointer += 2
 			err := vm.push(vm.globals[globalIndex])
 			if err != nil {
 				return err
@@ -105,15 +114,15 @@ func (vm *VM) Run() error {
 				return err
 			}
 		case code.OpJumpNotTruthy:
-			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
-			ip += 2
+			pos := int(code.ReadUint16(vm.instructions[intrustionPointer+1:]))
+			intrustionPointer += 2
 			condition := vm.pop()
 			if !isTruthy(condition) {
-				ip = pos - 1
+				intrustionPointer = pos - 1
 			}
 		case code.OpJump:
-			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
-			ip = pos - 1
+			pos := int(code.ReadUint16(vm.instructions[intrustionPointer+1:]))
+			intrustionPointer = pos - 1
 		case code.OpPop:
 			vm.pop()
 		}
@@ -130,6 +139,14 @@ func isTruthy(obj object.Object) bool {
 	default:
 		return true
 	}
+}
+
+func (vm *VM) buildArray(startIndex, endIndex int) object.Object {
+	elements := make([]object.Object, endIndex-startIndex)
+	for i := startIndex; i < endIndex; i++ {
+		elements[i-startIndex] = vm.stack[i]
+	}
+	return &object.Array{Elements: elements}
 }
 
 func (vm *VM) executeMinusOperator() error {
@@ -264,19 +281,19 @@ func (vm *VM) executeBinaryStringOperation(
 }
 
 func (vm *VM) push(o object.Object) error {
-	if vm.sp >= StackSize {
+	if vm.stackPointer >= StackSize {
 		return fmt.Errorf("stack overflow")
 	}
-	vm.stack[vm.sp] = o
-	vm.sp++
+	vm.stack[vm.stackPointer] = o
+	vm.stackPointer++
 	return nil
 }
 func (vm *VM) pop() object.Object {
-	o := vm.stack[vm.sp-1]
-	vm.sp--
+	o := vm.stack[vm.stackPointer-1]
+	vm.stackPointer--
 	return o
 }
 
 func (vm *VM) LastPoppedStackElem() object.Object {
-	return vm.stack[vm.sp]
+	return vm.stack[vm.stackPointer]
 }
