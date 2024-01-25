@@ -8,6 +8,7 @@ import (
 )
 
 const StackSize = 2048
+const MaxFrames = 1024
 const GlobalsSize = 65536
 
 var True = &object.Boolean{Value: true}
@@ -16,19 +17,37 @@ var Null = &object.Null{}
 
 type VM struct {
 	constants    []object.Object
-	instructions code.Instructions
 	stack        []object.Object
 	globals      []object.Object
+	frames       []*Frame
+	framesIndex  int
 	stackPointer int // Always points to the next value. Top of stack is stack[sp-1]
 }
 
+func (vm *VM) currentFrame() *Frame {
+	return vm.frames[vm.framesIndex-1]
+}
+func (vm *VM) pushFrame(f *Frame) {
+	vm.frames[vm.framesIndex] = f
+	vm.framesIndex++
+}
+func (vm *VM) popFrame() *Frame {
+	vm.framesIndex--
+	return vm.frames[vm.framesIndex]
+}
+
 func New(bytecode *compiler.Bytecode) *VM {
+	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
+	mainFrame := NewFrame(mainFn)
+	frames := make([]*Frame, MaxFrames)
+	frames[0] = mainFrame
 	return &VM{
-		instructions: bytecode.Instructions,
 		constants:    bytecode.Constants,
 		stack:        make([]object.Object, StackSize),
 		globals:      make([]object.Object, GlobalsSize),
 		stackPointer: 0,
+		frames:       frames,
+		framesIndex:  1,
 	}
 }
 
@@ -46,9 +65,16 @@ func (vm *VM) StackTop() object.Object {
 }
 
 func (vm *VM) Run() error {
-	for intrustionPointer := 0; intrustionPointer < len(vm.instructions); intrustionPointer++ {
-		op := code.Opcode(vm.instructions[intrustionPointer])
-		println(vm.instructions[intrustionPointer])
+	var ip int
+	var ins code.Instructions
+	var op code.Opcode
+	for vm.currentFrame().ip < len(vm.currentFrame().Instructions())-1 {
+		vm.currentFrame().ip++
+
+		ip = vm.currentFrame().ip
+		ins = vm.currentFrame().Instructions()
+		op = code.Opcode(ins[ip])
+
 		switch op {
 		case code.OpIndex:
 			index := vm.pop()
@@ -58,8 +84,8 @@ func (vm *VM) Run() error {
 				return err
 			}
 		case code.OpArray:
-			numElements := int(code.ReadUint16(vm.instructions[intrustionPointer+1:]))
-			intrustionPointer += 2
+			numElements := int(code.ReadUint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
 			array := vm.buildArray(vm.stackPointer-numElements, vm.stackPointer)
 			vm.stackPointer = vm.stackPointer - numElements
 			err := vm.push(array)
@@ -67,8 +93,8 @@ func (vm *VM) Run() error {
 				return err
 			}
 		case code.OpHash:
-			numElements := int(code.ReadUint16(vm.instructions[intrustionPointer+1:]))
-			intrustionPointer += 2
+			numElements := int(code.ReadUint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
 
 			hash, err := vm.buildHash(vm.stackPointer-numElements, vm.stackPointer)
 			if err != nil {
@@ -80,20 +106,19 @@ func (vm *VM) Run() error {
 				return nil
 			}
 		case code.OpConstant:
-			constIndex := code.ReadUint16(vm.instructions[intrustionPointer+1:])
-			intrustionPointer += 2
+			constIndex := code.ReadUint16(ins[ip+1:])
+			vm.currentFrame().ip += 2
 			err := vm.push(vm.constants[constIndex])
 			if err != nil {
 				return err
 			}
 		case code.OpSetGlobal:
-			globalIndex := code.ReadUint16(vm.instructions[intrustionPointer+1:])
-			intrustionPointer += 2
+			globalIndex := code.ReadUint16(ins[ip+1:])
+			vm.currentFrame().ip += 2
 			vm.globals[globalIndex] = vm.pop()
 		case code.OpGetGlobal:
-
-			globalIndex := code.ReadUint16(vm.instructions[intrustionPointer+1:])
-			intrustionPointer += 2
+			globalIndex := code.ReadUint16(ins[ip+1:])
+			vm.currentFrame().ip += 2
 			err := vm.push(vm.globals[globalIndex])
 			if err != nil {
 				return err
@@ -135,15 +160,15 @@ func (vm *VM) Run() error {
 				return err
 			}
 		case code.OpJumpNotTruthy:
-			pos := int(code.ReadUint16(vm.instructions[intrustionPointer+1:]))
-			intrustionPointer += 2
+			pos := int(code.ReadUint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
 			condition := vm.pop()
 			if !isTruthy(condition) {
-				intrustionPointer = pos - 1
+				vm.currentFrame().ip = pos - 1
 			}
 		case code.OpJump:
-			pos := int(code.ReadUint16(vm.instructions[intrustionPointer+1:]))
-			intrustionPointer = pos - 1
+			pos := int(code.ReadUint16(ins[ip+1:]))
+			vm.currentFrame().ip = pos - 1
 		case code.OpPop:
 			vm.pop()
 		}
