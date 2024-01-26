@@ -15,6 +15,42 @@ type vmTestCase struct {
 	expected interface{}
 }
 
+func TestFirstClassFunctions(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+           let returnsOne = fn() { 1; };
+           let returnsOneReturner = fn() { returnsOne; };
+           returnsOneReturner()();
+           `,
+			expected: 1,
+		},
+	}
+	runVmTests(t, tests)
+}
+
+func TestFunctionsWithoutReturnValue(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+           let noReturn = fn() { };
+           noReturn();
+           `,
+			expected: Null,
+		},
+		{
+			input: `
+           let noReturn = fn() { };
+           let noReturnTwo = fn() { noReturn(); };
+           noReturn();
+           noReturnTwo();
+           `,
+			expected: Null,
+		},
+	}
+	runVmTests(t, tests)
+}
+
 func TestFunctionsWithReturnStatement(t *testing.T) {
 	tests := []vmTestCase{
 		{
