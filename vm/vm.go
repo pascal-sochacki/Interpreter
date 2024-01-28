@@ -217,6 +217,10 @@ func (vm *VM) callFunction(numArgs int) error {
 	if !ok {
 		return fmt.Errorf("calling non-function")
 	}
+	if numArgs != fn.NumParameters {
+		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
+			fn.NumParameters, numArgs)
+	}
 	frame := NewFrame(fn, vm.stackPointer-numArgs)
 	vm.pushFrame(frame)
 	vm.stackPointer = frame.basePointer + fn.NumLocals
