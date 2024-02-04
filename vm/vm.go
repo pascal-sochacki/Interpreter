@@ -38,7 +38,8 @@ func (vm *VM) popFrame() *Frame {
 
 func New(bytecode *compiler.Bytecode) *VM {
 	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
-	mainFrame := NewFrame(mainFn, 0)
+	mainClosure := &object.Closure{Fn: mainFn}
+	mainFrame := NewFrame(mainClosure, 0)
 	frames := make([]*Frame, MaxFrames)
 	frames[0] = mainFrame
 	return &VM{
@@ -76,6 +77,14 @@ func (vm *VM) Run() error {
 		op = code.Opcode(ins[ip])
 
 		switch op {
+		case code.OpClosure:
+			constIndex := code.ReadUint16(ins[ip+1:])
+			_ = code.ReadUint8(ins[ip+3:])
+			vm.currentFrame().ip += 3
+			err := vm.pushClosure(int(constIndex))
+			if err != nil {
+				return err
+			}
 		case code.OpCall:
 			numArgs := code.ReadUint8(ins[ip+1:])
 			vm.currentFrame().ip += 1
@@ -223,8 +232,8 @@ func (vm *VM) Run() error {
 func (vm *VM) executeCall(numArgs int) error {
 	callee := vm.stack[vm.stackPointer-1-numArgs]
 	switch callee := callee.(type) {
-	case *object.CompiledFunction:
-		return vm.callFunction(callee, numArgs)
+	case *object.Closure:
+		return vm.callClosure(callee, numArgs)
 	case *object.Builtin:
 		return vm.callBuiltin(callee, numArgs)
 	default:
@@ -232,13 +241,13 @@ func (vm *VM) executeCall(numArgs int) error {
 	}
 }
 
-func (vm *VM) callFunction(fn *object.CompiledFunction, numArgs int) error {
-	if numArgs != fn.NumParameters {
-		return fmt.Errorf("wrong number of arguments: want=%d, got=%d", fn.NumParameters, numArgs)
+func (vm *VM) callClosure(cl *object.Closure, numArgs int) error {
+	if numArgs != cl.Fn.NumParameters {
+		return fmt.Errorf("wrong number of arguments: want=%d, got=%d", cl.Fn.NumParameters, numArgs)
 	}
-	frame := NewFrame(fn, vm.stackPointer-numArgs)
+	frame := NewFrame(cl, vm.stackPointer-numArgs)
 	vm.pushFrame(frame)
-	vm.stackPointer = frame.basePointer + fn.NumLocals
+	vm.stackPointer = frame.basePointer + cl.Fn.NumLocals
 	return nil
 }
 func (vm *VM) callBuiltin(builtin *object.Builtin, numArgs int) error {
@@ -449,6 +458,16 @@ func (vm *VM) executeBinaryStringOperation(
 		return fmt.Errorf("unkown interger operator: %d", op)
 	}
 	return vm.push(&object.String{Value: result})
+}
+
+func (vm *VM) pushClosure(constIndex int) error {
+	constant := vm.constants[constIndex]
+	function, ok := constant.(*object.CompiledFunction)
+	if !ok {
+		return fmt.Errorf("not a function: %+v", constant)
+	}
+	closure := &object.Closure{Fn: function}
+	return vm.push(closure)
 }
 
 func (vm *VM) push(o object.Object) error {
